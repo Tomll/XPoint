@@ -1,5 +1,6 @@
 package com.xpoint.drp;
 
+import android.accessibilityservice.AccessibilityService;
 import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.Service;
@@ -16,6 +17,7 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.view.accessibility.AccessibilityEvent;
 import android.widget.Toast;
 
 import java.io.OutputStream;
@@ -23,11 +25,13 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.List;
 
+import static android.view.KeyEvent.KEYCODE_NOTIFICATION;
+
 /**
  * Created by dongrp on 2017/2/20.
  */
 
-public class PointService extends Service {
+public class PointService extends AccessibilityService {
     private View pointView;
     private WindowManager windowManager;
     private WindowManager.LayoutParams params;
@@ -37,12 +41,25 @@ public class PointService extends Service {
     //2：必须在View的onTouchListener中的onTouch()方法中调用手势识别，而不能像Activity一样重载onTouchEvent，否则同样手势识别无法正确工作
     private GestureDetector gestureDetector;
 
-    @Nullable
+    //下面两个方法是父类AccessibilityService中的方法
+    @Override
+    public void onAccessibilityEvent(AccessibilityEvent accessibilityEvent) {
+
+    }
+
+    @Override
+    public void onInterrupt() {
+
+    }
+
+
+/*
+    AccessibilityService 中此方法是 final 所以我们就不能重写此方法了
     @Override
     public IBinder onBind(Intent intent) {
         //如果不允许以bind 的方式启动servcie 那就返回一个null ；如果允许，那就返回一个IBinder对象给调用者，调用者通过IBinder来调用service中的公开方法
         return null;
-    }
+    }*/
 
     @Override
     public void onCreate() {
@@ -53,8 +70,8 @@ public class PointService extends Service {
         //1.将真的服务设置为前台服务
         startForeground(798, new Notification());
         //2.启动假的前台服务,在服务内部执行startForground、stopForground就可以去掉通知了，然后stopSlef()就可以了
-//        Intent fakeIntent = new Intent(this, FakePointService.class);
-//        startService(fakeIntent);
+        //Intent fakeIntent = new Intent(this, FakePointService.class);
+        //startService(fakeIntent);
     }
 
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -165,18 +182,16 @@ public class PointService extends Service {
                     if (longPress) { //如果是长按：则之前在ACTION_MOVE中执行的 updateViewLayout()生效，并将longPress归为初始状态false
                         longPress = false;
                     } else {//如果不是长按：则之前的 updateViewLayout()无效，并将imageView归回原来的位置
-                        if (event.getRawY() - startImageY >= 100) {
+                        if (event.getRawY() - startImageY >= 100 && Math.abs(event.getRawX() - startImageX) < 80) {
                             //Toast.makeText(mContext, "下拉", Toast.LENGTH_SHORT).show();
-//                            exeShellCmd("input [touchscreen|touchpad|touchnavigation] swipe <x1> <y1> <x2> <y2>");//屏幕滑动
-//                            exeShellCmd("input [touchscreen|touchpad|touchnavigation] swipe 10  0  10  500");//屏幕滑动
-                            exeShellCmd("input swipe 10  0  10  500 ");//屏幕滑动
-
-                        } else if (event.getRawY() - startImageY <= -100) {
-                            //Toast.makeText(mContext, "上拉", Toast.LENGTH_SHORT).show();
+                            //exeShellCmd("input swipe 10  0  10  500 ");//shell屏幕滑动命令
+                            performGlobalAction(AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS);
+                        } else if (event.getRawY() - startImageY <= -100 && Math.abs(event.getRawX() - startImageX) < 80) {
+//                            Toast.makeText(mContext, "上拉", Toast.LENGTH_SHORT).show();
                             openRecent();
-                        } else if (event.getRawX() - startImageX >= 100) {
+                        } else if (event.getRawX() - startImageX >= 100 && Math.abs(event.getRawY() - startImageY) < 80) {
                             Toast.makeText(mContext, "右拉", Toast.LENGTH_SHORT).show();
-                        } else if (event.getRawX() - startImageX <= -100) {
+                        } else if (event.getRawX() - startImageX <= -100 && Math.abs(event.getRawY() - startImageY) < 80) {
                             Toast.makeText(mContext, "左拉", Toast.LENGTH_SHORT).show();
                         }
                         updateViewLayout(startImageX, startImageY);
@@ -220,6 +235,7 @@ public class PointService extends Service {
         @Override
         public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
             //Toast.makeText(mContext, "拖动" + e2.getAction(), Toast.LENGTH_SHORT).show();
+            Log.d("MyGestureListener", "distanceX:" + distanceX);
             updateViewLayout((int) (e2.getRawX() - pointView.getWidth() / 2),
                     (int) (e2.getRawY() - pointView.getHeight() / 2));
             return false;
@@ -243,12 +259,7 @@ public class PointService extends Service {
         @Override
         public boolean onDoubleTap(MotionEvent e) {
             //Toast.makeText(mContext, "双击" + e.getAction(), Toast.LENGTH_SHORT).show();
-            //exeShellCmd(" input  keyevent " + KeyEvent.KEYCODE_HOME);
-            Intent intent = new Intent(Intent.ACTION_MAIN);
-            intent.addCategory(Intent.CATEGORY_HOME);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(intent);
-
+            goToLauncher();//去Launcher主界面
             return false;
         }
 
@@ -263,36 +274,26 @@ public class PointService extends Service {
         @Override
         public boolean onSingleTapConfirmed(MotionEvent e) {
             //Toast.makeText(mContext, "单击" + e.getAction(), Toast.LENGTH_SHORT).show();
-            exeShellCmd(" input  keyevent 4 ");//shell命令执行返回键
+            //exeShellCmd(" input  keyevent 4 ");//shell命令执行返回键，就是 速度太慢
+            performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK);
             return false;
         }
     }
 
 
-    //执行shell命令
-/*    public void exeShellCmd(String cmd) {
-        try {
-            Process process = Runtime.getRuntime().exec("su");
-            DataOutputStream os = new DataOutputStream(process.getOutputStream());
-            os.write(cmd.getBytes());
-            os.writeBytes("\nexit\n");
-            os.flush();
-        } catch (IOException e1) {
-            e1.printStackTrace();
-        }
-    }*/
-
-
     private OutputStream os;
 
+    /**
+     * 执行shell命令（前提是应用获取了root权限）
+     */
     public final void exeShellCmd(String cmd) {
         try {
             if (os == null) {
-                Log.e("PointService", "os  空");
+                //Log.e("PointService", "os  空");
                 os = Runtime.getRuntime().exec("su").getOutputStream();
             }
             cmd += "\n";
-            Log.e("PointService", "cmd: " + cmd);
+            //Log.e("PointService", "cmd: " + cmd);
             os.write(cmd.getBytes());
             os.flush();
         } catch (Exception e1) {
@@ -335,13 +336,15 @@ public class PointService extends Service {
         }
     }
 
-
-    public void killCurrentApp() {
-        ActivityManager activityManager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
-        List<ActivityManager.RunningTaskInfo> runningTasks = activityManager.getRunningTasks(1);
-        if (null != runningTasks) {
-            activityManager.killBackgroundProcesses(runningTasks.get(0).topActivity.getPackageName());
-        }
+    /**
+     * 去Launcher主界面
+     */
+    public void goToLauncher(){
+        Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.addCategory(Intent.CATEGORY_HOME);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
     }
+
 
 }

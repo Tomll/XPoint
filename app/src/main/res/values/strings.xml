@@ -3,4 +3,5 @@
     <string name="xpoint_switch">XPoint开关</string>
     <string name="text_switch_on">开</string>
     <string name="text_switch_off">关</string>
+    <string name="start_floatingBall">开启XPoint悬浮球功能</string>
 </resources>

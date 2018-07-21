@@ -1,6 +1,7 @@
 package com.xpoint.drp;
 
 import android.app.ActivityManager;
+import android.app.Instrumentation;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -11,6 +12,7 @@ import android.provider.Settings;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.widget.CompoundButton;
 import android.widget.Switch;
 
@@ -26,6 +28,9 @@ public class SettingActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_setting);
+
+
+        startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
         xSwitch = findViewById(R.id.switch0);
         if (isServiceRunning(this, "com.xpoint.drp.PointService")) {
             xSwitch.setChecked(true);

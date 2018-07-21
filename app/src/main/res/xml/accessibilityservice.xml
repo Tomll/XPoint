@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+        android:accessibilityEventTypes="typeAllMask"
+        android:accessibilityFeedbackType="feedbackSpoken"
+        android:accessibilityFlags="flagDefault"
+        android:canRetrieveWindowContent="true"
+        android:description="@string/start_floatingBall"
+        android:notificationTimeout="100"
+        android:packageNames="com.xpoint.drp"
+        android:settingsActivity="com.xpoint.drp.SettingActivity" />
+
+</resources>
