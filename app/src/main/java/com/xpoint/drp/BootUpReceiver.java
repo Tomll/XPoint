@@ -14,9 +14,8 @@ public class BootUpReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         if (intent.getAction().equals(Intent.ACTION_BOOT_COMPLETED)){
-            Log.d("BootUpReceiver", "already_boot_up");
-            //请求root权限
-            RootContext.hasRootAccess(context);
+            //Log.d("BootUpReceiver", "already_boot_up");
+            //Application在onReceive之前先启动
             //接收到开机广播后，开启PointService
             context.startService( new Intent(context,PointService.class));
         }

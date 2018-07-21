@@ -1,5 +1,7 @@
 package com.xpoint.drp;
 
+import android.app.ActivityManager;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
@@ -12,6 +14,8 @@ import android.util.Log;
 import android.widget.CompoundButton;
 import android.widget.Switch;
 
+import java.util.ArrayList;
+
 /**
  * 应用设置界面
  */
@@ -22,12 +26,14 @@ public class SettingActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_setting);
-        xSwitch = (Switch) findViewById(R.id.switch0);
+        xSwitch = findViewById(R.id.switch0);
+        if (isServiceRunning(this, "com.xpoint.drp.PointService")) {
+            xSwitch.setChecked(true);
+        }
         xSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
-                    Log.d("dongrp", "is check");
                     startService(new Intent(SettingActivity.this, PointService.class));
                 } else {
                     stopService(new Intent(SettingActivity.this, PointService.class));
@@ -65,6 +71,26 @@ public class SettingActivity extends AppCompatActivity {
                         }).show();
             }
         }
+    }
+
+
+    /**
+     * 判断服务是否正在运行
+     * ServiceName:包名全路径，例如：com.xpoint.drp.PointService
+     */
+    public static boolean isServiceRunning(Context context, String ServiceName) {
+        if (("").equals(ServiceName) || ServiceName == null)
+            return false;
+        ActivityManager myManager = (ActivityManager) context
+                .getSystemService(Context.ACTIVITY_SERVICE);
+        ArrayList<ActivityManager.RunningServiceInfo> runningServices = (ArrayList<ActivityManager.RunningServiceInfo>) myManager
+                .getRunningServices(30);
+        for (int i = 0; i < runningServices.size(); i++) {
+            if (runningServices.get(i).service.getClassName().toString().equals(ServiceName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
 
