@@ -3,5 +3,6 @@
     <string name="xpoint_switch">XPoint开关</string>
     <string name="text_switch_on">开</string>
     <string name="text_switch_off">关</string>
-    <string name="start_floatingBall">开启XPoint悬浮球功能</string>
+    <string name="xpoint_float_ball_service">XPoint悬浮球服务</string>
+    <string name="accessibility_service_description">开启XPoint的悬浮球功能,体验更快捷的操作方式。</string>
 </resources>

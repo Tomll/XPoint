@@ -1,13 +1,16 @@
 package com.xpoint.drp;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.AccessibilityServiceInfo;
 import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.PixelFormat;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Message;
 import android.os.RemoteException;
 import android.support.annotation.Nullable;
 import android.util.Log;
@@ -24,6 +27,8 @@ import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import static android.view.KeyEvent.KEYCODE_NOTIFICATION;
 
@@ -41,9 +46,23 @@ public class PointService extends AccessibilityService {
     //2：必须在View的onTouchListener中的onTouch()方法中调用手势识别，而不能像Activity一样重载onTouchEvent，否则同样手势识别无法正确工作
     private GestureDetector gestureDetector;
 
+
+    Timer timerAlpha;
+    Handler handler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            if (msg.what == 0 && null != pointView) {
+                pointView.setAlpha(0.5f);
+            } else if (msg.what == 1 && null != pointView) {
+                pointView.setAlpha(0.3f);
+            }
+        }
+    };
+
     //下面两个方法是父类AccessibilityService中的方法
     @Override
-    public void onAccessibilityEvent(AccessibilityEvent accessibilityEvent) {
+    public void onAccessibilityEvent(AccessibilityEvent event) {
 
     }
 
@@ -52,8 +71,7 @@ public class PointService extends AccessibilityService {
 
     }
 
-
-/*
+    /*
     AccessibilityService 中此方法是 final 所以我们就不能重写此方法了
     @Override
     public IBinder onBind(Intent intent) {
@@ -80,6 +98,7 @@ public class PointService extends AccessibilityService {
         initWindowParams();
         //2、创建“小圆点”ImageView对象
         pointView = LayoutInflater.from(mContext).inflate(R.layout.layout_window, null, false);
+        pointView.setAlpha(0.6f);
         //3、添加“小圆点”到window中
         windowManager.addView(pointView, params);
         //创建手势监听对象，在imageView的onTouch()方法中:return gestureDetector.onTouchEvent(event)
@@ -109,8 +128,8 @@ public class PointService extends AccessibilityService {
         params.gravity = Gravity.START | Gravity.TOP;
         params.x = 750;
         params.y = 1450;
-        params.width = 80;
-        params.height = 80;
+        params.width = 100;
+        params.height = 100;
     }
 
     /**
@@ -135,7 +154,6 @@ public class PointService extends AccessibilityService {
         return result;
     }
 
-
     //onTouch监听所需要的成员变量
     long downTime;
     long upTime;
@@ -159,6 +177,11 @@ public class PointService extends AccessibilityService {
         public boolean onTouch(View v, MotionEvent event) {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
+                    if (null != timerAlpha) {
+                        timerAlpha.cancel();
+                        timerAlpha = null;
+                    }
+                    handler.sendEmptyMessage(0);
                     downTime = System.currentTimeMillis();
                     pointView.getLocationOnScreen(location);
                     startImageX = location[0];
@@ -179,19 +202,26 @@ public class PointService extends AccessibilityService {
                     break;
                 case MotionEvent.ACTION_UP:
                     upTime = System.currentTimeMillis();
+                    timerAlpha = new Timer();
+                    timerAlpha.schedule(new TimerTask() {
+                        @Override
+                        public void run() {
+                            handler.sendEmptyMessage(1);
+                        }
+                    }, 5 * 1000);//5s后透明度自动降低
                     if (longPress) { //如果是长按：则之前在ACTION_MOVE中执行的 updateViewLayout()生效，并将longPress归为初始状态false
                         longPress = false;
                     } else {//如果不是长按：则之前的 updateViewLayout()无效，并将imageView归回原来的位置
-                        if (event.getRawY() - startImageY >= 100 && Math.abs(event.getRawX() - startImageX) < 80) {
+                        if (event.getRawY() - startImageY >= 100 /*&& Math.abs(event.getRawX() - startImageX) < 80*/) {
                             //Toast.makeText(mContext, "下拉", Toast.LENGTH_SHORT).show();
                             //exeShellCmd("input swipe 10  0  10  500 ");//shell屏幕滑动命令
                             performGlobalAction(AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS);
-                        } else if (event.getRawY() - startImageY <= -100 && Math.abs(event.getRawX() - startImageX) < 80) {
-//                            Toast.makeText(mContext, "上拉", Toast.LENGTH_SHORT).show();
+                        } else if (event.getRawY() - startImageY <= -100 /*&& Math.abs(event.getRawX() - startImageX) < 80*/) {
+                            //Toast.makeText(mContext, "上拉", Toast.LENGTH_SHORT).show();
                             openRecent();
-                        } else if (event.getRawX() - startImageX >= 100 && Math.abs(event.getRawY() - startImageY) < 80) {
+                        } else if (event.getRawX() - startImageX >= 100 /*&& Math.abs(event.getRawY() - startImageY) < 80*/) {
                             Toast.makeText(mContext, "右拉", Toast.LENGTH_SHORT).show();
-                        } else if (event.getRawX() - startImageX <= -100 && Math.abs(event.getRawY() - startImageY) < 80) {
+                        } else if (event.getRawX() - startImageX <= -100 /*&& Math.abs(event.getRawY() - startImageY) < 80*/) {
                             Toast.makeText(mContext, "左拉", Toast.LENGTH_SHORT).show();
                         }
                         updateViewLayout(startImageX, startImageY);
@@ -281,29 +311,8 @@ public class PointService extends AccessibilityService {
     }
 
 
-    private OutputStream os;
-
     /**
-     * 执行shell命令（前提是应用获取了root权限）
-     */
-    public final void exeShellCmd(String cmd) {
-        try {
-            if (os == null) {
-                //Log.e("PointService", "os  空");
-                os = Runtime.getRuntime().exec("su").getOutputStream();
-            }
-            cmd += "\n";
-            //Log.e("PointService", "cmd: " + cmd);
-            os.write(cmd.getBytes());
-            os.flush();
-        } catch (Exception e1) {
-            e1.printStackTrace();
-        }
-    }
-
-
-    /**
-     * 打开最近任务列表
+     * 反射打开最近任务列表
      */
     public void openRecent() {
         Class serviceManagerClass;
@@ -339,11 +348,31 @@ public class PointService extends AccessibilityService {
     /**
      * 去Launcher主界面
      */
-    public void goToLauncher(){
+    public void goToLauncher() {
         Intent intent = new Intent(Intent.ACTION_MAIN);
         intent.addCategory(Intent.CATEGORY_HOME);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
+    }
+
+    private OutputStream os;
+
+    /**
+     * 执行shell命令（前提是应用获取了root权限）
+     */
+    public final void exeShellCmd(String cmd) {
+        try {
+            if (os == null) {
+                //Log.e("PointService", "os  空");
+                os = Runtime.getRuntime().exec("su").getOutputStream();
+            }
+            cmd += "\n";
+            //Log.e("PointService", "cmd: " + cmd);
+            os.write(cmd.getBytes());
+            os.flush();
+        } catch (Exception e1) {
+            e1.printStackTrace();
+        }
     }
 
 

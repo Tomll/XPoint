@@ -1,5 +1,6 @@
 package com.xpoint.drp;
 
+import android.accessibilityservice.AccessibilityServiceInfo;
 import android.app.ActivityManager;
 import android.app.Instrumentation;
 import android.content.Context;
@@ -13,10 +14,12 @@ import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.accessibility.AccessibilityManager;
 import android.widget.CompoundButton;
 import android.widget.Switch;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 应用设置界面
@@ -28,10 +31,12 @@ public class SettingActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_setting);
+        initView();
 
+    }
 
-        startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-        xSwitch = findViewById(R.id.switch0);
+    public void initView() {
+        xSwitch = (Switch) findViewById(R.id.switch0);
         if (isServiceRunning(this, "com.xpoint.drp.PointService")) {
             xSwitch.setChecked(true);
         }
@@ -50,16 +55,19 @@ public class SettingActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        checkOverlyPermission();//检查悬浮穿权限
+        checkDrawOverlyAndAccessibilityServicePermission();//检查悬浮窗 及AccessibilityService权限
     }
 
     /**
-     * 检查并请求用户给予悬浮窗的权限
+     * 检查悬浮窗 及AccessibilityService权限,并引导开启
      */
-    public void checkOverlyPermission() {
+    public void checkDrawOverlyAndAccessibilityServicePermission() {
+        //API >=23，需要在manifest中申请权限，并在每次需要用到权限的时候检查是否已有该权限，因为用户随时可以取消掉。
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (!Settings.canDrawOverlays(this)) {
+            if (!Settings.canDrawOverlays(getApplicationContext())) {
                 new AlertDialog.Builder(SettingActivity.this)
+                        .setCancelable(false)
+                        .setCancelable(false)
                         .setTitle("权限请求").setMessage("请允许XPoint在其他应用的上层显示")
                         .setPositiveButton("是", new DialogInterface.OnClickListener() {
                             @Override
@@ -74,13 +82,61 @@ public class SettingActivity extends AppCompatActivity {
                                 finish();
                             }
                         }).show();
+            } else {
+                checkAccessibilityServicePermission();
+            }
+        } else {
+            checkAccessibilityServicePermission();
+        }
+    }
+
+    public void checkAccessibilityServicePermission() {
+        if (!isStartAccessibilityService(getApplicationContext(), getPackageName())) {
+            Log.d("SettingActivity", "未开启 无障碍服务");
+            new AlertDialog.Builder(SettingActivity.this)
+                    .setTitle("权限请求").setMessage("请在稍后弹出的界面中，开启XPoint悬浮球服务")
+                    .setPositiveButton("是", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                        }
+                    })
+                    .setNegativeButton("否", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            finish();
+                        }
+                    }).show();
+        } else {
+            Log.d("SettingActivity", "yikaiqi  无障碍服务");
+
+        }
+    }
+
+    /**
+     * 判断AccessibilityService服务是否已经启动
+     *
+     * @param context
+     * @param name:应用包名
+     * @return
+     */
+    public static boolean isStartAccessibilityService(Context context, String name) {
+        AccessibilityManager am = (AccessibilityManager) context.getSystemService(Context.ACCESSIBILITY_SERVICE);
+        List<AccessibilityServiceInfo> serviceInfos = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC);
+        for (AccessibilityServiceInfo info : serviceInfos) {
+
+            String id = info.getId();
+            Log.d("SettingActivity", id);
+            if (id.contains(name)) {
+                return true;
             }
         }
+        return false;
     }
 
 
     /**
-     * 判断服务是否正在运行
+     * 判断某一个服务是否正在运行
      * ServiceName:包名全路径，例如：com.xpoint.drp.PointService
      */
     public static boolean isServiceRunning(Context context, String ServiceName) {
@@ -89,7 +145,7 @@ public class SettingActivity extends AppCompatActivity {
         ActivityManager myManager = (ActivityManager) context
                 .getSystemService(Context.ACTIVITY_SERVICE);
         ArrayList<ActivityManager.RunningServiceInfo> runningServices = (ArrayList<ActivityManager.RunningServiceInfo>) myManager
-                .getRunningServices(30);
+                .getRunningServices(50);
         for (int i = 0; i < runningServices.size(); i++) {
             if (runningServices.get(i).service.getClassName().toString().equals(ServiceName)) {
                 return true;
@@ -97,6 +153,5 @@ public class SettingActivity extends AppCompatActivity {
         }
         return false;
     }
-
 
 }
